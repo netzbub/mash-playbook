@@ -12,7 +12,7 @@ Generally, newer is better. We only strive to support released stable versions o
 
 This playbook somewhat supports running on non-`amd64` architectures like ARM. See [Alternative Architectures](alternative-architectures.md).
 
-If your distro runs within an [LXC container](https://linuxcontainers.org/), you may hit [this issue](https://github.com/spantaleev/matrix-docker-ansible-deploy/issues/703). It can be worked around, if absolutely necessary, but we suggest that you avoid running from within an LXC container.
+If your distro runs within an [LXC container](https://linuxcontainers.org/), you may hit [this issue](https://github.com/spantaleev/matrix--ansible-deploy/issues/703). It can be worked around, if absolutely necessary, but we suggest that you avoid running from within an LXC container.
 
 - `root` access to your server (or a user capable of elevating to `root` via `sudo`).
 
@@ -30,7 +30,7 @@ If your distro runs within an [LXC container](https://linuxcontainers.org/), you
 
 - at least one domain name you can use
 
-- Some TCP/UDP ports open. This playbook (actually [Docker itself](https://docs.docker.com/network/iptables/)) configures the server's internal firewall for you. In most cases, you don't need to do anything special. But **if your server is running behind another firewall**, you'd need to open these ports:
+- Some TCP/UDP ports open. This playbook (actually [ itself](https://docs..com/network/iptables/)) configures the server's internal firewall for you. In most cases, you don't need to do anything special. But **if your server is running behind another firewall**, you'd need to open these ports:
 
   - `80/tcp`: HTTP webserver
   - `443/tcp`: HTTPS webserver

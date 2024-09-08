@@ -6,7 +6,7 @@ Sometimes, you're using a server which already has Traefik. In such cases these 
 
 - the playbook trying to run its own Traefik instance and running into a conflict with your other Traefik instance over ports (`tcp/80` and `tcp/443`)
 
-- multiple playbooks trying to install Docker, etc.
+- multiple playbooks trying to install , etc.
 
 Below, we offer some suggestions for how to make this playbook more interoperable. Feel free to cherry-pick the parts that make sense for your setup.
 
@@ -15,15 +15,15 @@ Below, we offer some suggestions for how to make this playbook more interoperabl
 
 If you're installing [Traefik](services/traefik.md) on your server in another way, you can use your already installed Traefik instance and [disable the Traefik instance installed by MASH](services/traefik.md#using-another-traefik-instance-not-installing-traefik).
 
-If you are using the [matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy) playbook, it already runs its own Traefik instance (`matrix-traefik`). We recommend that you [disable the Traefik instance installed by MASH](services/traefik.md#using-another-traefik-instance-not-installing-traefik), because the Traefik instance installed by the Matrix playbook does the same, but also contains additional configuration for handling the Matrix federation port (`8448`).
+If you are using the [matrix--ansible-deploy](https://github.com/spantaleev/matrix--ansible-deploy) playbook, it already runs its own Traefik instance (`matrix-traefik`). We recommend that you [disable the Traefik instance installed by MASH](services/traefik.md#using-another-traefik-instance-not-installing-traefik), because the Traefik instance installed by the Matrix playbook does the same, but also contains additional configuration for handling the Matrix federation port (`8448`).
 
 
-## Disabling Docker installation
+## Disabling  installation
 
-If you're installing [Docker](https://www.docker.com/) on your server in another way, disable this component from the playbook:
+If you're installing [](https://www..com/) on your server in another way, disable this component from the playbook:
 
 ```yaml
-mash_playbook_docker_installation_enabled: false
+mash_playbook__installation_enabled: false
 ```
 
 
