@@ -95,7 +95,7 @@ If your SSH key is at a different path (not in `$HOME/.ssh/id_rsa`), adjust that
 Once you execute the above command, you'll be dropped into a `/work` directory inside a  container.
 The `/work` directory contains the playbook's code.
 
-First, consider running `git config --global --add safe.directory /work` to [resolve directory ownership issues](#resolve-directory-ownership-issues).
+First, consider running `git config --global --add safe.directory /work` to [resolve directory ownership issues](02-ansible.md#resolve-directory-ownership-issues).
 
 Finally, you execute `just` or `ansible-playbook ...` commands as per normal now.
 
