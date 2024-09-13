@@ -1,0 +1,1232 @@
+---
+
+########################################################################
+########################################################################
+#                                                                      #
+# Playbook                                                             #
+#                                                                      #
+########################################################################
+
+# Put a strong secret below, generated with `pwgen -s 64 1` or in another way
+# Various other secrets will be derived from this secret automatically.
+mash_playbook_generic_secret_key: ''
+
+########################################################################
+#                                                                      #
+# /Playbook                                                            #
+#                                                                      #
+########################################################################
+########################################################################
+
+
+
+########################################################################
+########################################################################
+#                                                                      #
+# Docker                                                               #
+#                                                                      #
+########################################################################
+
+# To disable Docker installation (in case you'd be installing Docker in another way),
+# remove the line below.
+mash_playbook_docker_installation_enabled: true
+
+# To disable Docker SDK for Python installation (in case you'd be installing the SDK in another way),
+# remove the line below.
+devture_docker_sdk_for_python_installation_enabled: true
+
+########################################################################
+#                                                                      #
+# /Docker                                                              #
+#                                                                      #
+########################################################################
+########################################################################
+
+
+
+########################################################################
+########################################################################
+#                                                                      #
+# com.devture.ansible.role.timesync                                    #
+#                                                                      #
+########################################################################
+
+# To ensure the server's clock is synchronized (using systemd-timesyncd/ntpd),
+# we enable the timesync service.
+
+devture_timesync_installation_enabled: true
+
+########################################################################
+#                                                                      #
+# /com.devture.ansible.role.timesync                                   #
+#                                                                      #
+########################################################################
+########################################################################
+
+
+
+
+########################################################################
+########################################################################
+#                                                                      #
+# devture-traefik                                                      #
+#                                                                      #
+########################################################################
+
+# Most services require a reverse-proxy, so we enable Traefik here.
+#
+# Learn more about the Traefik service in docs/services/traefik.md
+#
+# If your server already runs Traefik, you will run into port conflicts by installing it twice.
+# See docs/interoperability.md for solutions.
+
+mash_playbook_reverse_proxy_type: playbook-managed-traefik
+
+# The email address that Traefik will pass to Let's Encrypt when obtaining SSL certificates
+devture_traefik_config_certificatesResolvers_acme_email: your-email@example.com
+
+########################################################################
+#                                                                      #
+# /devture-traefik                                                     #
+#                                                                      #
+########################################################################
+
+
+
+########################################################################
+#                                                                      #
+# devture-postgres                                                     #
+#                                                                      #
+########################################################################
+
+
+# Most services require a Postgres database, so we enable Postgres here.
+#
+# Learn more about the Postgres service in docs/services/postgres.md
+
+devture_postgres_enabled: true
+
+# Put a strong password below, generated with `pwgen -s 64 1` or in another way
+devture_postgres_connection_password: ''
+
+########################################################################
+#                                                                      #
+# /devture-postgres                                                    #
+#                                                                      #
+########################################################################
+########################################################################
+
+
+
+########################################################################
+########################################################################
+#                                                                      #
+# exim_relay                                                           #
+#                                                                      #
+########################################################################
+
+# Various services need to send out email.
+#
+# Enabling this Exim relay SMTP mailer service automatically wires
+# all other services to send email through it.
+#
+# exim-relay then gives you a centralized place for configuring email-sending.
+
+exim_relay_enabled: true
+
+exim_relay_hostname: mash.example.com
+
+exim_relay_sender_address: "someone@{{ exim_relay_hostname }}"
+
+# By default, exim-relay attempts to deliver emails directly.
+# To make it relay via an external SMTP server, see docs/services/exim-relay.md
+
+########################################################################
+#                                                                      #
+# /exim_relay                                                          #
+#                                                                      #
+########################################################################
+########################################################################
+
+
+
+########################################################################
+########################################################################
+# Nextcloud
+
+[Nextcloud](https://nextcloud.com/) is the most popular self-hosted collaboration solution for tens of millions of users at thousands of organizations across the globe.
+
+
+## Dependencies
+
+This service requires the following other services:
+
+- a [Postgres](postgres.md) database
+- a [Traefik](traefik.md) reverse-proxy server
+- (optional) a [KeyDB](keydb.md) data-store, installation details [below](#keydb)
+- (optional) the [exim-relay](exim-relay.md) mailer
+
+
+## Configuration
+
+To enable this service, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+
+########################################################################
+#                                                                      #
+# nextcloud                                                            #
+#                                                                      #
+########################################################################
+
+nextcloud_enabled: true
+
+nextcloud_hostname: mash.example.com
+nextcloud_path_prefix: /nextcloud
+
+# KeyDB configuration, as described below
+
+########################################################################
+#                                                                      #
+# /nextcloud                                                           #
+#                                                                      #
+########################################################################
+```
+
+In the example configuration above, we configure the service to be hosted at `https://mash.example.com/nextcloud`.
+
+You can remove the `nextcloud_path_prefix` variable definition, to make it default to `/`, so that the service is served at `https://mash.example.com/`.
+
+### KeyDB
+
+KeyDB can **optionally** be enabled to improve Nextcloud performance.
+It's dubious whether using using KeyDB helps much, so we recommend that you **start without** it, for a simpler deployment.
+
+To learn more, read the [Memory caching](https://docs.nextcloud.com/server/latest/admin_manual/configuration_server/caching_configuration.html) section of the Nextcloud documentation.
+
+As described on the [KeyDB](keydb.md) documentation page, if you're hosting additional services which require KeyDB on the same server, you'd better go for installing a separate KeyDB instance for each service. See [Creating a KeyDB instance dedicated to Nextcloud](#creating-a-keydb-instance-dedicated-to-nextcloud).
+
+If you're only running Nextcloud on this server and don't need to use KeyDB for anything else, you can [use a single KeyDB instance](#using-the-shared-keydb-instance-for-nextcloud).
+
+**Regardless** of the method of installing KeyDB, you may need to adjust your Nextcloud configuration file (e.g. `/mash/nextcloud/data/config/config.php`) to **add** this:
+
+```php
+  'memcache.distributed' => '\OC\Memcache\KeyDB',
+  'memcache.locking' => '\OC\Memcache\KeyDB',
+  'keydb' => [
+     'host' => 'REDIS_HOSTNAME_HERE',
+     'port' => 6379,
+  ],
+```
+
+Where `REDIS_HOSTNAME_HERE` is to be replaced with:
+
+- `mash-nextcloud-keydb`, when [Creating a KeyDB instance dedicated to Nextcloud](#creating-a-keydb-instance-dedicated-to-nextcloud)
+- `mash-keydb`, when [using a single KeyDB instance](#using-the-shared-keydb-instance-for-nextcloud).
+
+
+#### Using the shared KeyDB instance for Nextcloud
+
+To install a single (non-dedicated) KeyDB instance (`mash-keydb`) and hook Nextcloud to it, add the following **additional** configuration:
+
+```yaml
+########################################################################
+#                                                                      #
+# keydb                                                                #
+#                                                                      #
+########################################################################
+
+keydb_enabled: true
+
+########################################################################
+#                                                                      #
+# /keydb                                                               #
+#                                                                      #
+########################################################################
+
+
+########################################################################
+#                                                                      #
+# nextcloud                                                            #
+#                                                                      #
+########################################################################
+
+# Base configuration as shown above
+
+# Point Nextcloud to the shared KeyDB instance
+nextcloud_redis_hostname: "{{ keydb_identifier }}"
+
+# Make sure the Nextcloud service (mash-nextcloud.service) starts after the shared KeyDB service (mash-keydb.service)
+nextcloud_systemd_required_services_list_custom:
+  - "{{ keydb_identifier }}.service"
+
+# Make sure the Nextcloud container is connected to the container network of the shared KeyDB service (mash-keydb)
+nextcloud_container_additional_networks_custom:
+  - "{{ keydb_identifier }}"
+
+########################################################################
+#                                                                      #
+# /nextcloud                                                           #
+#                                                                      #
+########################################################################
+```
+This will create a `mash-keydb` KeyDB instance on this host.
+
+This is only recommended if you won't be installing other services which require KeyDB. Alternatively, go for [Creating a KeyDB instance dedicated to Nextcloud](#creating-a-keydb-instance-dedicated-to-nextcloud).
+
+#### Creating a KeyDB instance dedicated to Nextcloud
+
+The following instructions are based on the [Running multiple instances of the same service on the same host](../running-multiple-instances.md) documentation.
+
+Adjust your `inventory/hosts` file as described in [Re-do your inventory to add supplementary hosts](../running-multiple-instances.md#re-do-your-inventory-to-add-supplementary-hosts), adding a new supplementary host (e.g. if `nextcloud.example.com` is your main one, create `nectcloud.example.com-deps`).
+
+Then, create a new `vars.yml` file for the
+
+`inventory/host_vars/nextcloud.example.com-deps/vars.yml`:
+
+```yaml
+---
+
+########################################################################
+#                                                                      #
+# Playbook                                                             #
+#                                                                      #
+########################################################################
+
+# Put a strong secret below, generated with `pwgen -s 64 1` or in another way
+# Various other secrets will be derived from this secret automatically.
+mash_playbook_generic_secret_key: ''
+
+# Override service names and directory path prefixes
+mash_playbook_service_identifier_prefix: 'mash-nextcloud-'
+mash_playbook_service_base_directory_name_prefix: 'nextcloud-'
+
+########################################################################
+#                                                                      #
+# /Playbook                                                            #
+#                                                                      #
+########################################################################
+
+
+########################################################################
+#                                                                      #
+# keydb                                                                #
+#                                                                      #
+########################################################################
+
+keydb_enabled: true
+
+########################################################################
+#                                                                      #
+# /keydb                                                               #
+#                                                                      #
+########################################################################
+```
+
+This will create a `mash-nextcloud-keydb` instance on this host with its data in `/mash/nextcloud-keydb`.
+
+Then, adjust your main inventory host's variables file (`inventory/host_vars/nextcloud.example.com/vars.yml`) like this:
+
+```yaml
+########################################################################
+#                                                                      #
+# nextcloud                                                            #
+#                                                                      #
+########################################################################
+
+# Base configuration as shown above
+
+# Point Nextcloud to its dedicated KeyDB instance
+nextcloud_redis_hostname: mash-nextcloud-keydb
+
+# Make sure the Nextcloud service (mash-nextcloud.service) starts after its dedicated KeyDB service (mash-nextcloud-keydb.service)
+nextcloud_systemd_required_services_list_custom:
+  - "mash-nextcloud-keydb.service"
+
+# Make sure the Nextcloud container is connected to the container network of its dedicated KeyDB service (mash-nextcloud-keydb)
+nextcloud_container_additional_networks_custom:
+  - "mash-nextcloud-keydb"
+
+########################################################################
+#                                                                      #
+# /nextcloud                                                           #
+#                                                                      #
+########################################################################
+```
+
+###  Single-Sign-On / Authentik
+
+Nextcloud supports Single-Sign-On (SSO) via LDAP, SAML, and OIDC. To make use of this you'll need a Identity 
+Provider like [authentik](./authentik.md) or [Keycloak](./keycloak.md). The following assumes you use authentik.
+
+
+**The official documentation of authentik to connect nextcloud via SAML seems broken**
+
+MASH can connect Nextcloud with authentik via OIDC. The setup is quite straightforward, refer to [this blogpost by Jack]
+(https://blog.cubieserver.de/2022/complete-guide-to-nextcloud-oidc-authentication-with-authentik/) for a full explanation.
+
+In short you should:
+
+* Create a new provider in authentik and trim the client secret to <64 characters
+* Create an application in authentik using this provider
+* Install the app `user_oidc` in Nextcloud
+* Fill in the details from authentik in the app settings
+
+**Troubleshooting**
+
+If you encounter problems during login check (error message containes `SHA1 mismatch`) that
+* Nextcloud users and authentik users do not have the same name -> if they do check `Use unique user ID` in the OIDC App settings
+
+### Samba
+
+To enable [Samba](https://www.samba.org/) external Windows fileshares using [smbclient]
+(https://www.samba.org/samba/docs/current/man-html/smbclient.1.html), add the following additional configuration to your `vars.yml` file:
+
+```yml
+nextcloud_container_image_customizations_samba_enabled: true
+```
+
+## Installation
+
+If you've decided to install a dedicated KeyDB instance for Nextcloud, make sure to first do [installation]
+(../installing.md) for the supplementary inventory host (e.g. `nextcloud.example.com-deps`), before running 
+installation for the main one (e.g. `nextcloud.example.com`).
+
+## Usage
+
+After [installation](../installing.md), you should follow Nextcloud's setup wizard at the URL you've chosen.
+
+You can choose any username/password for your account.
+
+In **Storage & database**, you should choose PostgreSQL (changing the default **SQLite** choice), with the credentials 
+you see after running `just run-tags print-nextcloud-db-credentials`
+
+Once you've fully installed Nextcloud, you'd better adjust its default configuration (URL paths, trusted reverse-proxies, etc.) 
+by running: `just run-tags adjust-nextcloud-config`
+
+
+## Recommended other services
+
+### Collabora Online
+
+To integrate the [Collabora Online](collabora-online.md) office suite, first install it by following its dedicated documentation page.
+
+Then add the following **additional** Nextcloud configuration:
+
+```yaml
+nextcloud_collabora_app_wopi_url: "{{ collabora_online_url }}"
+
+# By default, various private IPv4 networks are whitelited to connect to the WOPI API (document serving API).
+# If your Collabora Online installation does not live on the same server as Nextcloud,
+# you may need to adjust the list of networks.
+# If necessary, redefined the `nextcloud_collabora_app_wopi_allowlist` environment variable here.
+```
+
+There's **no need** to [re-run the playbook](../installing.md) after adjusting your `vars.yml` file.
+You should, however run: `just run-tags install-nextcloud-app-collabora`
+
+This will install and configure the [Office](https://apps.nextcloud.com/apps/richdocuments) app for Nextcloud.
+
+You should then be able to click any document (`.doc`, `.odt`, `.pdf`, etc.) in Nextcloud Files and it should automatically
+open a Collabora Online editor.
+
+You can also create new documents via the "plus" button.
+
+### Preview Generator
+
+It is possible to setup preview generation, using this playbook.
+
+First modify your `vars.yml` file by adding at least the following line (other options are also present, check the 
+corresponding `defaults/main.yml` file):
+
+```yaml
+nextcloud_preview_enabled: true
+```
+
+then install Nextcloud (or rerun the playbook if already installed).
+
+Next, from the Settings/Application menu in your Nextcloud instance install the preview generator app 
+(https://apps.nextcloud.com/apps/previewgenerator).
+
+After the application is installed run `just run-tags adjust-nextcloud-config` that will start the original preview-generation 
+and when finished, enables the periodic generation of new images.
+
+The original generation may take a long time, but a continuous prompt is presented by ansible as some visual feedback 
+(it is being run as an async task), however it will timeout after approximately 27 hours.
+
+On 60GBs, most of the data being images, it took about 10 minutes to finish.
+
+If it takes more time to run than a day, you may want to start it from the host by calling
+
+```sh
+/usr/bin/env docker exec mash-nextcloud-server php /var/www/html/occ preview:generate-all
+```
+
+Also, please note: every time Nextcloud version is updated, you should rerun: `just run-tags adjust-nextcloud-config`.
+
+Other supported variables:
+
+`nextcloud_preview_preview_max_x` and `nextcloud_preview_preview_max_y` sets the maximum size of the preview in pixels..
+Their default value according to the [documentation](https://docs.nextcloud.com/server/latest/admin_manual/configuration_files/previews_configuration.html) 
+is `null` which is set by the playbook.
+Using a numeric value will set the corresponding nextcloud variable and sets the size of the preview images.
+
+`nextcloud_preview_app_jpeg_quality` JPEG quality setting for preview images.
+The default follows upstream default with 80.
+
+
+########################################################################
+########################################################################
+########################################################################
+# Collabora Online
+
+The [Collabora Online Development Edition (CODE)](https://www.collaboraoffice.com/) office suite, together with the 
+[Office App](https://apps.nextcloud.com/apps/richdocuments) for [Nextcloud](nextcloud.md) enables you to edit office documents online.
+
+
+## Dependencies
+
+This service requires the following other services:
+
+- a [Postgres](postgres.md) database
+- a [Traefik](traefik.md) reverse-proxy server
+
+
+## Configuration
+
+To enable this service, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+
+########################################################################
+#                                                                      #
+# collabora-online                                                     #
+#                                                                      #
+########################################################################
+
+collabora_online_enabled: true
+
+collabora_online_hostname: collabora.example.com
+
+# A password for the admin interface, available at: https://COLLABORA_ONLINE_DOMAIN/browser/dist/admin/admin.html
+# Use only alpha-numeric characters
+collabora_online_env_variable_password: ''
+
+collabora_online_aliasgroup: "https://{{ nextcloud_hostname | replace('.', '\\.') }}:443"
+
+########################################################################
+#                                                                      #
+# /collabora-online                                                    #
+#                                                                      #
+########################################################################
+
+
+In the example configuration above, we configure the service to be hosted at `https://collabora.example.com`.
+
+
+## Integrating with Nextcloud
+
+To learn how to integrate Collabora Online with Nextcloud, see the [Collabora Online section](nextcloud.md#collabora-online) 
+in our Nextcloud documentation.
+
+
+## Admin Interface
+
+There's an admin interface with various statistics and information at: `https://COLLABORA_ONLINE_DOMAIN/browser/dist/admin/admin.html`
+
+Use your admin credentials for logging in:
+
+- the default username is `admin`, as specified in `collabora_online_env_variable_username`
+- the password is the one you've specified in `collabora_online_env_variable_password`
+
+########################################################################
+########################################################################
+########################################################################
+
+
+
+
+########################################################################
+########################################################################
+########################################################################
+
+# Healthchecks
+
+[Healthchecks](https://healthchecks.io/) is simple and Effective **Cron Job Monitoring** solution.
+
+
+## Dependencies
+
+This service requires the following other services:
+
+- a [Postgres](postgres.md) database
+- a [Traefik](traefik.md) reverse-proxy server
+- (optional) the [exim-relay](exim-relay.md) mailer
+
+
+## Configuration
+
+To enable this service, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+
+########################################################################
+#                                                                      #
+# healthchecks                                                         #
+#                                                                      #
+########################################################################
+
+healthchecks_enabled: true
+
+healthchecks_hostname: mash.example.com
+
+healthchecks_path_prefix: /healthchecks
+
+########################################################################
+#                                                                      #
+# /healthchecks                                                        #
+#                                                                      #
+########################################################################
+
+
+### URL
+
+In the example configuration above, we configure the service to be hosted at `https://mash.example.com/healthchecks`.
+
+You can remove the `healthchecks_path_prefix` variable definition, to make it default to `/`, so that the service is 
+served at `https://mash.example.com/`.
+
+### Authentication
+
+The first superuser account is created after installation. See [Usage](#usage).
+You can create as many accounts as you wish.
+
+### Email integration
+
+If you've enabled the [exim-relay](exim-relay.md) mailer service, Healtchecks will automatically be configured to send through it.
+
+If you need to configure Healthchecks to send email directly, the [ansible.role.healthchecks]
+(https://github.com/mother-of-all-self-hosting/ansible-role-healthchecks) Ansible role provides various variables for tweaking 
+the email-sending configuration in its `default/main.yml` file (`healthchecks_environment_variable_default_from_email` and various 
+`healthchecks_environment_variable_email_*` variables).
+
+### Integrating with other services
+
+Refer to the [upstream `.env.example` file](https://github.com/healthchecks/healthchecks/blob/master/docker/.env.example) for 
+discovering additional environment variables.
+
+You can pass these to the Healthchecks container using the `healthchecks_environment_variables_additional_variables` variable. Example:
+
+```yml
+healthchecks_environment_variables_additional_variables: |
+  DISCORD_CLIENT_ID=123
+  DISCORD_CLIENT_SECRET=456
+```
+
+
+## Usage
+
+After installation, you need to **create a superuser account**.
+This is an interactive process which can be initiated by **SSH-ing into into the server** and **running a command** like this:
+
+```sh
+docker exec -it mash-healthchecks /opt/healthchecks/manage.py createsuperuser
+```
+
+After creating the superuser account, you can go to the [Healthchecks URL](#url) to log in and start setting up healthchecks.
+
+
+## Recommended other services
+
+- [Prometheus](prometheus.md) - a metrics collection and alerting monitoring solution
+
+
+########################################################################
+########################################################################
+
+
+
+
+########################################################################
+########################################################################
+
+
+# Jitsi
+
+[Jitsi](https://jitsi.org/) is a fully encrypted, 100% Open Source **video conferencing** solution
+
+
+## Dependencies
+
+This service requires the following other services:
+
+- a [Traefik](traefik.md) reverse-proxy server
+
+
+## Configuration
+
+To enable this service, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+```yaml
+########################################################################
+#                                                                      #
+# jitsi                                                                #
+#                                                                      #
+########################################################################
+
+jitsi_enabled: true
+
+jitsi_hostname: mash.example.com
+jitsi_path_prefix: /jitsi
+
+########################################################################
+#                                                                      #
+# /jitsi                                                               #
+#                                                                      #
+########################################################################
+```
+
+### URL
+
+In the example configuration above, we configure the service to be hosted at `https://mash.example.com/jitsi`.
+
+You can remove the `jitsi_path_prefix` variable definition, to make it default to `/`, so that the service is served at 
+`https://mash.example.com/`.
+
+**Note**: there are minor quirks when hosting under a subpath, such as:
+
+- [When hosting under a subpath, pwa-worker.js is attempted to be loaded from the base domain without a subpath]
+(https://github.com/jitsi/docker-jitsi-meet/issues/1515)
+- [When hosting under a subpath, ending the meeting redirects to the base domain without subpath]
+(https://github.com/jitsi/docker-jitsi-meet/issues/1514)
+
+
+### Authentication
+
+By default the Jitsi Meet instance **does not require any kind of login and is open to use for anyone without registration**.
+
+If you're fine with such an open Jitsi instance, please skip ahead.
+
+If you would like to control who is allowed to open meetings on your new Jitsi instance, then please follow 
+the following steps to enable Jitsi's authentication and optionally guests mode.
+Currently, there are three supported authentication modes: `internal` (default), `matrix` and `ldap`.
+
+**Note:** Authentication is not tested via the playbook's self-checks.
+We therefore recommend that you manually verify if authentication is required by Jitsi.
+For this, try to manually create a conference in your browser.
+
+
+#### Authenticate using Jitsi accounts (Auth-Type 'internal')
+
+The default authentication mechanism is `internal` auth, which requires Jitsi accounts to be setup and is the recommended setup.
+
+With authentication enabled, all meeting rooms have to be opened by a registered user, after which guests are free to join.
+If a registered host is not yet present, guests are put on hold in individual waiting rooms.
+
+Use the following **additional** configuration:
+
+```yaml
+jitsi_enable_auth: true
+jitsi_enable_guests: true
+jitsi_prosody_auth_internal_accounts:
+  - username: "jitsi-moderator"
+    password: "secret-password"
+  - username: "another-user"
+    password: "another-password"
+```
+
+**Caution:** Accounts added here and subsequently removed will not be automatically removed from the Prosody server until user account 
+cleaning is integrated into the [ansible-role-jitsi](https://github.com/mother-of-all-self-hosting/ansible-role-jitsi) Ansible role.
+
+**If you get an error** like this: "Error: Account creation/modification not supported.", 
+it's likely that you had previously installed Jitsi without auth/guest support. In such a case, you should look into 
+[Rebuilding your Jitsi installation](#rebuilding-your-jitsi-installation).
+
+
+#### Authenticate using Matrix OpenID (Auth-Type 'matrix')
+
+Using this authentication type require a [Matrix User Verification Service](https://github.com/matrix-org/matrix-user-verification-service).
+
+This playbook does **not** support installing the Matrix User Verification Service. You can install this service with the 
+[matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy) playbook. See the [Setting up Matrix User Verification Service]
+(https://github.com/spantaleev/matrix-docker-ansible-deploy/blob/master/docs/configuring-playbook-user-verification-service.md) 
+documentation for `matrix-docker-ansible-deploy`.
+
+To enable Matrix auth for a Jitsi installation managed by this playbook, use this **additional** configuration:
+
+```yaml
+jitsi_enable_auth: true
+jitsi_auth_type: matrix
+
+# Auth token for Matrix User Verification Service
+jitsi_prosody_auth_matrix_uvs_auth_token: ''
+# URL where Matrix User Verification Service is hosted
+jitsi_prosody_auth_matrix_uvs_location: ''
+```
+
+You may also wish to see the [matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy) 
+playbook's [Authenticate using Matrix OpenID (Auth-Type 'matrix')]
+(https://github.com/spantaleev/matrix-docker-ansible-deploy/blob/master/docs/configuring-playbook-jitsi.md#authenticate-using-matrix-openid-auth-type-matrix) 
+documentation section.
+
+
+### Authenticate using LDAP (Auth-Type 'ldap')
+
+An example LDAP configuration could be:
+
+```yaml
+jitsi_enable_auth: true
+jitsi_auth_type: ldap
+jitsi_ldap_url: "ldap://ldap.DOMAIN"
+jitsi_ldap_base: "OU=People,DC=DOMAIN"
+#jitsi_ldap_binddn: ""
+#jitsi_ldap_bindpw: ""
+jitsi_ldap_filter: "uid=%u"
+jitsi_ldap_auth_method: "bind"
+jitsi_ldap_version: "3"
+jitsi_ldap_use_tls: true
+jitsi_ldap_tls_ciphers: ""
+jitsi_ldap_tls_check_peer: true
+jitsi_ldap_tls_cacert_file: "/etc/ssl/certs/ca-certificates.crt"
+jitsi_ldap_tls_cacert_dir: "/etc/ssl/certs"
+jitsi_ldap_start_tls: false
+```
+
+For more information refer to the [docker-jitsi-meet](https://github.com/jitsi/docker-jitsi-meet#authentication-using-ldap) and the 
+[saslauthd `LDAP_SASLAUTHD`](https://github.com/winlibs/cyrus-sasl/blob/master/saslauthd/LDAP_SASLAUTHD) documentation.
+
+
+### Networking
+
+**In addition** to ports `80` and `443` exposed by the [Traefik](traefik.md) reverse-proxy, the following ports 
+will be exposed by the Jitsi containers on **all network interfaces**:
+
+- `4443` over **TCP**, controlled by `jitsi_jvb_rtp_tcp_port` - RTP media fallback over TCP
+- `10000` over **UDP**, controlled by `jitsi_jvb_rtp_udp_port` - RTP media over UDP. Depending on your firewall/NAT setup, 
+incoming RTP packets on port `10000` may have the external IP of your firewall as destination address, due to the usage of STUN in JVB 
+(see [`jitsi_jvb_stun_servers`](https://github.com/mother-of-all-self-hosting/ansible-role-jitsi/blob/main/defaults/main.yml)).
+
+Docker automatically opens these ports in the server's firewall, so you **likely don't need to do anything**. 
+If you use another firewall in front of the server, you may need to adjust it.
+
+To learn more, see the upstream [Firewall documentation](https://jitsi.github.io/handbook/docs/devops-guide/devops-guide-docker/#external-ports).
+
+
+### (Optional) Making your Jitsi server work on a LAN
+
+By default the Jitsi Meet instance does not work with a client in LAN (Local Area Network), even if others are connected from WAN. 
+There are no video and audio. In the case of WAN to WAN everything is ok.
+
+The reason is the Jitsi VideoBridge git to LAN client the IP address of the docker image instead of the host. 
+The [documentation](https://jitsi.github.io/handbook/docs/devops-guide/devops-guide-docker/#running-behind-nat-or-on-a-lan-environment) 
+of Jitsi in docker suggest to add `JVB_ADVERTISE_IPS` in enviornment variable to make it work.
+
+Here is how to do it in the playbook.
+
+Use the following **additional** configuration:
+
+```yaml
+jitsi_jvb_container_extra_arguments:
+  - '--env "JVB_ADVERTISE_IPS=<Local IP address of the host>"'
+```
+
+### Additional configuration
+
+#### (Optional) Fine tune Jitsi
+
+Sample **additional** configuration to save up resources (explained below):
+
+```yaml
+jitsi_web_custom_config_extension: |
+  config.enableLayerSuspension = true;
+
+  config.disableAudioLevels = true;
+
+  // Limit the number of video feeds forwarded to each client
+  config.channelLastN = 4;
+
+jitsi_web_config_resolution_width_ideal_and_max: 480
+jitsi_web_config_resolution_height_ideal_and_max: 240
+```
+
+You may want to **suspend unused video layers** until they are requested again, to save up resources on both server and clients.
+Read more on this feature [here](https://jitsi.org/blog/new-off-stage-layer-suppression-feature/)
+
+You may wish to **disable audio levels** to avoid excessive refresh of the client-side page and decrease the CPU consumption involved.
+
+You may want to **limit the number of video feeds forwarded to each client**, to save up resources on both server and clients. 
+As clients' bandwidth and CPU may not bear the load, use this setting to avoid lag and crashes.
+This feature is found by default in other webconference applications such as Office 365 Teams (limit is set to 4).
+Read how it works [here](https://github.com/jitsi/jitsi-videobridge/blob/master/doc/last-n.md) and performance evaluation on this 
+[study](https://jitsi.org/wp-content/uploads/2016/12/nossdav2015lastn.pdf).
+
+You may want to **limit the maximum video resolution**, to save up resources on both server and clients.
+
+#### (Optional) Specify a Max number of participants on a Jitsi conference
+
+The playbook allows a user to set a max number of participants allowed to join a Jitsi conference. By default there is no limit.
+
+In order to set the max number of participants use the following **additional** configuration:
+
+```yaml
+jitsi_prosody_max_participants: 4 # example value
+```
+
+
+#### (Optional) Disable Gravatar
+
+In the default upstream Jisti Meet configuration, [gravatar.com](https://gravatar.com/) is enabled as an avatar service. 
+This results in third party request leaking data to Gravatar.
+
+To disable Gravatar integration, use the following **additional** configuration:
+
+```yaml
+jitsi_disable_gravatar: false
+```
+
+## Usage
+
+After installation, you can go to the [Jitsi URL](#url) and start an audio/video conference.
+
+
+## Troubleshooting
+
+### Rebuilding your Jitsi installation
+
+**If you ever run into any trouble** or **if you change configuration (`jitsi_*` variables) too much**, we urge you to rebuild your Jitsi setup.
+
+We normally don't require such manual intervention for other services, but Jitsi services generate a lot of configuration files on their own.
+
+These files are not all managed by Ansible (at least not yet), so you may sometimes need to delete them all and start fresh.
+
+To rebuild your Jitsi configuration:
+
+- ask Ansible to stop all Jitsi services: `just run-tags stop-group --extra-vars=group=jitsi`
+- SSH into the server and do this and remove all Jitsi configuration & data (`rm -rf /mash/jitsi`)
+- ask Ansible to set up Jitsi anew and restart services (`just install-service jitsi`)
+
+########################################################################
+########################################################################
+########################################################################
+
+
+
+########################################################################
+########################################################################
+########################################################################
+
+
+
+# KeyDB
+
+[KeyDB](https://docs.keydb.dev/) is an open source, in-memory data store used by millions of developers as a database, 
+cache, streaming engine, and message broker.
+
+We used to advocate for using [Redis](redis.md), but since [Redis is now "source available"](https://redis.com/blog/redis-adopts-dual-source-available-licensing/) 
+we recommend that you use KeyDB instead. KeyDB is compatible with Redis, so switching should be straightforward. 
+You can learn more about the switch from Redis to KeyDB in [this changelog entry]
+(https://github.com/spantaleev/matrix-docker-ansible-deploy/blob/50813c600db1c47b1f3e76707b81fe05d6c46ef5/CHANGELOG.md#backward-compatibility-break-the-playbook-now-defaults-to-keydb-instead-of-redis) for [matrix-docker-ansible-deploy](https://github.com/spantaleev/matrix-docker-ansible-deploy).
+
+Some of the services installed by this playbook require a KeyDB data store.
+
+**Warning**: Because KeyDB is not as flexible as [Postgres](postgres.md) when it comes to authentication and data separation, 
+it's **recommended that you run separate KeyDB instances** (one for each service). KeyDB supports multiple database and a 
+[SELECT](https://docs.keydb.dev/docs/commands/#select) command for switching between them. However, **reusing the same KeyDB instance is not good enough** because:
+
+- if all services use the same KeyDB instance and database (id = 0), services may conflict with one another
+- the number of databases is limited to [16 by default](https://github.com/Snapchat/KeyDB/blob/0731a0509a82af5114da1b5aa6cf8ba84c06e134/keydb.conf#L342-L345), 
+which may or may not be enough. With configuration changes, this is solveable.
+- some services do not support switching the KeyDB database and always insist on using the default one (id = 0)
+- KeyDB [does not support different authentication credentials for its different databases](https://stackoverflow.com/a/37262596), so each service can potentially read and modify other services' data
+
+If you're only hosting a single service (like [PeerTube](peertube.md) or [NetBox](netbox.md)) on your server, you can get away with running a single instance. If you're hosting multiple services, you should prepare separate instances for each service.
+
+
+## Configuration
+
+To enable this service, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) 
+process to **host a single instance of the KeyDB service**:
+
+```yaml
+########################################################################
+#                                                                      #
+# keydb                                                                #
+#                                                                      #
+########################################################################
+
+keydb_enabled: true
+
+########################################################################
+#                                                                      #
+# /keydb                                                               #
+#                                                                      #
+########################################################################
+```
+
+To **host multiple instances of the KeyDB service**, follow the [Running multiple instances of the same service on the same host]
+(../running-multiple-instances.md) documentation or the **KeyDB** section (if available) of the service you're installing.
+
+
+
+
+########################################################################
+########################################################################
+########################################################################
+
+# Setting up borg backup (optional)
+
+The playbook can install and configure [borgbackup](https://www.borgbackup.org/) with [borgmatic](https://torsion.org/borgmatic/) for you.
+BorgBackup is a deduplicating backup program with optional compression and encryption.
+That means your daily incremental backups can be stored in a fraction of the space and is safe whether you store it at home or on a cloud service.
+
+You will need a remote server where borg will store the backups. There are hosted, borg compatible solutions available, such as [BorgBase](https://www.borgbase.com).
+
+The backup will run based on `backup_borg_schedule` var (systemd timer calendar), default: 4am every day.
+
+By default, Borg backups will include a dump of your database if you're using the [integrated Postgres server](postgres.md) or the [integrated MariaDB server](mariadb.md). An alternative solution for backing up the Postgres database is [postgres backup](configuring-playbook-postgres-backup.md).
+
+If you decide to go with another solution:
+
+- you can disable Postgres-backup support for Borg using the `backup_borg_postgresql_enabled` variable.
+- you can disable MariaDB-backup support for Borg using the `backup_borg_mysql_enabled` variable.
+
+If you're using an external database server (regardless of type), you may point borgbackup to it. See the `backup_borg_postgresql_*` or `backup_borg_mysql_*` variables.
+
+## Prerequisites
+
+1. Create a new SSH key:
+
+```bash
+ssh-keygen -t ed25519 -N '' -f borg-backup -C MASH
+```
+
+This can be done on any machine and you don't need to place the key in the `.ssh` folder. It will be added to the Ansible config later.
+
+1. Add the **public** part of this SSH key (the `borg-backup.pub` file) to your borg provider/server:
+
+If you plan to use a hosted solution, follow their instructions. If you have your own server, copy the key over:
+
+```bash
+# example to append the new PUBKEY contents, where:
+# PUBKEY is path to the public key,
+# USER is a ssh user on a provider / server
+# HOST is a ssh host of a provider / server
+cat PUBKEY | ssh USER@HOST 'dd of=.ssh/authorized_keys oflag=append conv=notrunc'
+```
+
+## Adjusting the playbook configuration
+
+Minimal working configuration (`inventory/host_vars/<yourdomain>/vars.yml`) to enable borg backup:
+
+```yaml
+
+########################################################################
+#                                                                      #
+# backup-borg                                                          #
+#                                                                      #
+########################################################################
+
+backup_borg_enabled: true
+backup_borg_location_repositories:
+ - ssh://USER@HOST/./REPO
+backup_borg_storage_encryption_passphrase: "PASSPHRASE"
+backup_borg_ssh_key_private: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  THISMUSTBEREPLACEDc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZW
+  xpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRv
+  bG9yZSBtYWduYSBhbGlxdWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3
+  RydWQgZXhlcmNpdGF0aW9uIHVsbGFtY28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXgg
+  ZWEgY29tbW9kbyBjb25zZXF1YXQuIA==
+  -----END OPENSSH PRIVATE KEY-----
+
+########################################################################
+#                                                                      #
+# /backup-borg                                                         #
+#                                                                      #
+########################################################################
+```
+
+where:
+
+* USER - SSH user of a provider/server
+* HOST - SSH host of a provider/server
+* REPO - borg repository name, it will be initialized on backup start, eg: `mash`, regarding Syntax see [Remote repositories](https://borgbackup.readthedocs.io/en/stable/usage/general.html#repository-urls)
+* PASSPHRASE - passphrase used for encrypting backups, you may generate it with `pwgen -s 64 1` or use any password manager
+* PRIVATE KEY - the content of the **private** part of the SSH key you created before. The whole key (all of its belonging lines) under `backup_borg_ssh_key_private` needs to be indented with 2 spaces
+
+To backup without encryption, add `backup_borg_encryption: 'none'` to your vars. This will also enable the `backup_borg_unknown_unencrypted_repo_access_is_ok` variable.
+
+`backup_borg_location_source_directories` defines the list of directories to back up: it's set to `{{ mash_playbook_base_path }}` by default, which is the base directory for every service's data, such as Nextcloud, Postgres and all others. You might want to exclude certain directories or file patterns from the backup using the `backup_borg_location_exclude_patterns` variable.
+
+Check the `roles/galaxy/backup-borg/defaults/main.yml` file for the full list of available options.
+
+## Installing
+
+After configuring the playbook, run the [installation](installing.md) command again:
+
+```
+just install-all
+```
+
+## Manually start a backup
+
+For testing your setup it can be helpful to not wait until 4am. If you want to run the backup immediately, log onto the server
+and run `systemctl start mash-backup-borg`. This will not return until the backup is done, so possibly a long time.
+Consider using [tmux](https://en.wikipedia.org/wiki/Tmux) if your SSH connection is unstable.
+
+########################################################################
+########################################################################
+########################################################################
+
+
+
+
+
+########################################################################
+########################################################################
+########################################################################
+
+# System-related configuration
+
+This Ansible playbook can install and configure various system-related things for you.
+All the sections below relate to the host OS instead of the managed containers.
+
+### swap
+
+To enable [swap](https://en.wikipedia.org/wiki/Memory_paging) management (also read more in the [Swap](https://wiki.archlinux.org/title/Swap) article in the [Arch Linux Wiki](https://wiki.archlinux.org/)), add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+```yaml
+########################################################################
+#                                                                      #
+# system                                                               #
+#                                                                      #
+########################################################################
+
+system_swap_enabled: true
+
+########################################################################
+#                                                                      #
+# /system                                                              #
+#                                                                      #
+########################################################################
+```
+
+A swap file will be created in `/var/swap` (configured using the `system_swap_path` variable) and enabled in your `/etc/fstab` file.
+
+By default, the swap file will have `1GB` size, but you can set the `system_swap_size` variable in megabytes, example (4gb):
+
+```yaml
+system_swap_size: 4096
+```
+
+**Warning**: changing `system_swap_size` subsequently will not recreate the SWAP file with the new size. You will need to disable swap, re-run the playbook (to make it clean up), then enable it again with the new size.
+
+### ssh
+
+> **Warning**: advanced functionality! While the default config with a few adjustments was battle tested on hundreds of servers,
+> you should use it with caution and verify everything before you apply the changes!
+
+To enable [ssh server](https://www.openssh.com/) config and authorized/unauthorized keys management, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+```yaml
+########################################################################
+#                                                                      #
+# system                                                               #
+#                                                                      #
+########################################################################
+
+system_security_ssh_enabled: true
+
+system_security_ssh_port: 22
+
+system_security_ssh_authorizedkeys_host: [] # list of authorized public keys
+system_security_ssh_unauthorizedkeys_host: [] # list of unauthorized/revoked public keys
+
+########################################################################
+#                                                                      #
+# /system                                                              #
+#                                                                      #
+########################################################################
+```
+
+The [default configuration](https://gitlab.com/etke.cc/roles/ssh/-/blob/main/defaults/main.yml) is good enough as-is, but we strongly suggest you to **verify everything before applying any changes!**, otherwise you may lock yourself out of the server.
+
+With this configuration, the default `/etc/ssh/sshd_config` file on your server will be replaced by a new one, managed by the [ssh role](https://gitlab.com/etke.cc/roles/ssh) (see its [templates/etc/ssh/sshd_config.j2](https://gitlab.com/etke.cc/roles/ssh/-/blob/main/templates/etc/ssh/sshd_config.j2) file).
+
+There are various configuration options - check the defaults and adjust them to your needs.
+
+### cleanup
+
+Playbook may perform some housekeeping automatically, cleaning up unused docker resources, logs, even kernels (debian-only) and packages (debian-only). Here is how to enable different housekeeping tasks that will run on `setup-all`, `setup-cleanup`, `install-cleanup`:
+
+
+```yaml
+########################################################################
+#                                                                      #
+# system                                                               #
+#                                                                      #
+########################################################################
+
+# runs `docker system prune -a -f --volumes` to remove unused images and containers
+system_cleanup_docker: true
+
+# configures a systemd unit (and timer) that runs `journalctl --vacuum-time=7d` daily, you can control schedules using system_cleanup_logs_* vars
+system_cleanup_logs: true
+
+# list of arbitrary absolute paths to remove on each invocation
+system_cleanup_paths: []
+
+# The following options are Debian only, will have no effect on any other distro family
+
+# runs safe-upgrade, apt autoclean, aptautoremove, etc.
+system_cleanup_apt: true
+
+# WARNING: very dangerous! Purges old linux kernels, and their modules
+system_cleanup_kernels: false
+
+########################################################################
+#                                                                      #
+# /system                                                              #
+#                                                                      #
+########################################################################
+```
+
+
+### fail2ban
+
+To enable [fail2ban](https://fail2ban.org/wiki/index.php/Main_Page) installation, management and integration with SSHd, add the following configuration to your `vars.yml` file and re-run the [installation](../installing.md) process:
+
+```yaml
+########################################################################
+#                                                                      #
+# system                                                               #
+#                                                                      #
+########################################################################
+
+system_security_fail2ban_enabled: true
+
+system_security_fail2ban_sshd_port: 22
+# If you enabled playbook-managed ssh as described above,
+# you can replace the line above with the following:
+# system_security_fail2ban_sshd_port: "{{ system_security_ssh_port }}"
+
+########################################################################
+#                                                                      #
+# /system                                                              #
+#                                                                      #
+########################################################################
+```
+
+########################################################################
+########################################################################
+########################################################################
+
+
+
+
+
+
+
+
+
+
+
+# You can add additional services here, as you see fit.
+# To discover new services and configuration, see docs/supported-services.md
