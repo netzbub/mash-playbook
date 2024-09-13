@@ -1,5 +1,5 @@
-inventory/
-z_old_stuff/
+/inventory
+/z_old_stuff
 
 # ignore roles pulled by ansible-galaxy
 /roles/galaxy/*
@@ -23,12 +23,10 @@ z_old_stuff/
 
 # Untrack files
 #git rm --cached <file>
-
 git rm --cached inventory
 git rm --cached z_old_stuff
 
 # Remove files
 # git rm <file>
-
 git rm inventory
 git rm z_old_stuff
